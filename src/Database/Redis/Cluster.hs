@@ -130,6 +130,7 @@ instance Exception TimeoutException
 
 connect :: (Host -> CC.PortID -> Maybe Int -> IO CC.ConnectionContext) -> [CMD.CommandInfo] -> MVar ShardMap -> Maybe Int -> Bool -> ([NodeConnection] -> IO ShardMap) -> IO Connection
 connect withAuth commandInfos shardMapVar timeoutOpt isReadOnly refreshShardMap = do
+        putStrLn "Redis Cluster Trying to connect..."
         shardMap <- readMVar shardMapVar
         stateVar <- newMVar $ Pending []
         pipelineVar <- newMVar $ Pipeline stateVar
@@ -250,6 +251,7 @@ evaluatePipeline shardMapVar refreshShardmapAction conn requests = do
         requestsByNode <- case erequestsByNode of
             Right reqByNode-> pure reqByNode
             Left (_ :: MissingNodeException) -> do
+                putStrLn "Node Missing... Refreshing Shard Map"
                 refreshShardMapVar
                 newShardMap <- hasLocked $ readMVar shardMapVar
                 getRequestsByNode newShardMap
@@ -270,7 +272,9 @@ evaluatePipeline shardMapVar refreshShardmapAction conn requests = do
               Left (err :: SomeException) ->
                 case fromException err of
                   Just (er :: TimeoutException) -> throwIO er
-                  _ -> executeRequests (getRandomConnection cc conn) r
+                  _ -> do
+                    putStrLn "Exception but not TimeoutException...fetching Random Connection"
+                    executeRequests (getRandomConnection cc conn) r
             ) (zip eresps requestsByNode)
         -- check for any moved in both responses and continue the flow.
         when (any (moved . rawResponse) resps) refreshShardMapVar
@@ -305,6 +309,7 @@ retryBatch shardMapVar refreshShardmapAction conn retryCount requests replies =
     -- there is one.
     case last replies of
         (Error errString) | B.isPrefixOf "MOVED" errString -> do
+            putStrLn "Exec MOVED... Retry Batch."
             let (Connection _ _ _ infoMap _) = conn
             keys <- mconcat <$> mapM (requestKeys infoMap) requests
             hashSlot <- hashSlotForKeys (CrossSlotException requests) keys
@@ -345,7 +350,9 @@ evaluateTransactionPipeline shardMapVar refreshShardmapAction conn requests' = d
     resps <-
       case eresps of
         Right v -> return v
-        Left (_ :: SomeException) -> requestNode (getRandomConnection nodeConn conn) requests
+        Left (_ :: SomeException) -> do
+            putStrLn "evaluateTransactionPipeline... SomeException... Getting Random Connection"
+            requestNode (getRandomConnection nodeConn conn) requests
     -- The Redis documentation has the following to say on the effect of
     -- resharding on multi-key operations:
     --

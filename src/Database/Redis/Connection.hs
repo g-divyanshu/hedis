@@ -286,6 +286,7 @@ refreshShardMapWithNodeConn nodeConnsList = do
     pipelineConn <- PP.fromCtx ctx
     envTimeout <- fromMaybe (10 ^ (3 :: Int)) . (>>= readMaybe) <$> lookupEnv "REDIS_CLUSTER_SLOTS_TIMEOUT"
     raceResult <- race (threadDelay envTimeout) (try $ refreshShardMapWithConn pipelineConn True) -- racing with delay of default 1 ms 
+    putStrLn "refreshShardMapWithNodeConn"
     case raceResult of
         Left () -> do
             print $ "TimeoutForConnection " <> show ctx 
