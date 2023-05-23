@@ -175,7 +175,27 @@ main = do
           Right _ -> return ()
           _ -> error "error"
         return ()
-        
+
+    timeAction "del 1" 1 $ do
+        res <- sequence $ map (\x -> del x ) $ [["kto1"::BS.ByteString]]
+        case sequence res of
+          Right _ -> return ()
+          _ -> error "error"
+        return ()
+
+    timeAction "del 100" 100 $ do
+        res <- sequence $ map (\x -> del [x] ) $ keyGenerator 100 ("kt"::BS.ByteString)
+        case sequence res of
+          Right _ -> return ()
+          _ -> error "error"
+        return ()
+
+
+keyGenerator :: Int -> BS.ByteString -> [BS.ByteString]
+keyGenerator 0 _  = []
+keyGenerator x key =
+    let bSx = (BS.pack $ show x)
+    in [BS.append key bSx] <> keyGenerator (x-1) key
 
 
 keyValueGenerator :: Int -> BS.ByteString -> BS.ByteString -> [(BS.ByteString, BS.ByteString)]

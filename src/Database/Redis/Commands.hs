@@ -320,8 +320,13 @@ import Prelude hiding (min,max)
 import Data.ByteString (ByteString)
 import Database.Redis.ManualCommands
 import Database.Redis.Types
-import Database.Redis.Core(sendRequest, RedisCtx)
-
+import Database.Redis.Core(sendRequest, RedisCtx, reRedis, liftRedis)
+import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
+import System.IO.Unsafe (unsafePerformIO)
+import System.CPUTime
+import GHC.TopHandler
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 ttl
     :: (RedisCtx m f)
     => ByteString -- ^ key
@@ -475,7 +480,14 @@ sadd
     => ByteString -- ^ key
     -> [ByteString] -- ^ member
     -> m (f Integer)
-sadd key member = sendRequest (["SADD"] ++ [encode key] ++ map encode member )
+sadd key member = do
+    t1 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr1 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    res <- sendRequest (["SADD"] ++ [encode key] ++ map encode member )
+    t2 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr2 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    liftRedis $ reRedis $ lift $ putStrLn ("Operation sadd: " <> (show key) <> " CPU Time: " <> (show . (/ 1000000000) . fromInteger $ (t2 - t1)) <> " CurrentTime: " <> (show $ (getCurr2 - getCurr1)))
+    pure res 
 
 lindex
     :: (RedisCtx m f)
@@ -703,7 +715,14 @@ get
     :: (RedisCtx m f)
     => ByteString -- ^ key
     -> m (f (Maybe ByteString))
-get key = sendRequest (["GET"] ++ [encode key] )
+get key = do
+    t1 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr1 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    res <- sendRequest (["GET"] ++ [encode key] )
+    t2 <-  liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr2 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    liftRedis $ reRedis $ lift $ putStrLn ("Operation get: " <> (show key) <> " CPU Time: " <> (show . (/ 1000000000) . fromInteger $ (t2 - t1)) <> " CurrentTime: " <> (show $ (getCurr2 - getCurr1)))
+    pure res 
 
 getrange
     :: (RedisCtx m f)
@@ -791,7 +810,14 @@ setex
     -> Integer -- ^ seconds
     -> ByteString -- ^ value
     -> m (f Status)
-setex key seconds value = sendRequest (["SETEX"] ++ [encode key] ++ [encode seconds] ++ [encode value] )
+setex key seconds value = do
+    t1 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr1 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    res <- sendRequest (["SETEX"] ++ [encode key] ++ [encode seconds] ++ [encode value] )
+    t2 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr2 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    liftRedis $ reRedis $ lift $ putStrLn ("Operation setex: " <> (show key) <> " CPU Time: " <> (show . (/ 1000000000) . fromInteger $ (t2 - t1)) <> " CurrentTime: " <> (show $ (getCurr2 - getCurr1)))
+    pure res
 
 psetex
     :: (RedisCtx m f)
@@ -879,7 +905,14 @@ del
     :: (RedisCtx m f)
     => [ByteString] -- ^ key
     -> m (f Integer)
-del key = sendRequest (["DEL"] ++ map encode key )
+del key = do
+    t1 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr1 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    res <- sendRequest (["DEL"] ++ map encode key )
+    t2 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr2 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    liftRedis $ reRedis $ lift $ putStrLn ("Operation del: " <> (show key) <> " CPU Time: " <> (show . (/ 1000000000) . fromInteger $ (t2 - t1)) <> " CurrentTime: " <> (show $ (getCurr2 - getCurr1)))
+    pure $ res
 
 hincrbyfloat
     :: (RedisCtx m f)

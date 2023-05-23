@@ -14,6 +14,12 @@ import Database.Redis.Core
 import Database.Redis.Protocol
 import Database.Redis.Types
 import qualified Database.Redis.Cluster.Command as CMD
+import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
+import System.IO.Unsafe (unsafePerformIO)
+import System.CPUTime
+import GHC.TopHandler
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 
 
 objectRefcount
@@ -833,7 +839,14 @@ xadd
     -> ByteString -- ^ id
     -> [(ByteString, ByteString)] -- ^ (field, value)
     -> m (f ByteString)
-xadd key entryId fieldValues = xaddOpts key entryId fieldValues NoArgs
+xadd key entryId fieldValues = do
+    t1 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr1 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    res <- xaddOpts key entryId fieldValues NoArgs
+    t2 <- liftRedis $ reRedis $ lift $ getCPUTime
+    getCurr2 <- liftRedis $ reRedis $ lift $ getCurrentTimePosix ()
+    liftRedis $ reRedis $ lift $ putStrLn ("Operation xadd: " <> (show key) <> " CPU Time: " <> (show . (/ 1000000000) . fromInteger $ (t2 - t1)) <> " CurrentTime: " <> (show $ (getCurr2 - getCurr1)))
+    pure res
 
 data StreamsRecord = StreamsRecord
     { recordId :: ByteString
@@ -1431,3 +1444,7 @@ command = sendRequest ["COMMAND"]
 
 readOnly :: (RedisCtx m f) => m (f Status)
 readOnly = sendRequest ["READONLY"]
+
+
+getCurrentTimePosix :: () -> IO POSIXTime
+getCurrentTimePosix _ = (* 1000) <$> getPOSIXTime
